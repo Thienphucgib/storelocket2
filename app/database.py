@@ -216,3 +216,35 @@ def update_order_status(oid,status):
     conn=sqlite3.connect(DB_NAME); c=conn.cursor(); c.execute('UPDATE orders SET status=? WHERE id=?',(status,oid)); conn.commit(); ok=c.rowcount>0; conn.close(); return ok
 
 init_store_db()
+
+# --- Website settings ---
+DEFAULT_SITE_SETTINGS = {
+    'site_name': 'THIENPHUC GOLD',
+    'tagline': 'Premium · Xử lý tự động 24/7',
+    'hero_title': 'Nâng cấp trải nghiệm của bạn',
+    'hero_subtitle': 'Chọn gói phù hợp, xác nhận tài khoản và theo dõi đơn hàng ngay trên website.',
+    'bank_name': 'MB BANK',
+    'bank_account': '',
+    'bank_owner': '',
+    'support_url': '',
+    'support_text': 'Hỗ trợ 24/7',
+}
+
+def init_site_settings():
+    conn=sqlite3.connect(DB_NAME); c=conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT DEFAULT "")')
+    for k,v in DEFAULT_SITE_SETTINGS.items():
+        c.execute('INSERT OR IGNORE INTO site_settings(key,value) VALUES(?,?)',(k,v))
+    conn.commit(); conn.close()
+
+def get_site_settings():
+    init_site_settings(); conn=sqlite3.connect(DB_NAME); c=conn.cursor()
+    data=dict(DEFAULT_SITE_SETTINGS); data.update(dict(c.execute('SELECT key,value FROM site_settings').fetchall())); conn.close(); return data
+
+def save_site_settings(data):
+    init_site_settings(); conn=sqlite3.connect(DB_NAME); c=conn.cursor()
+    for k in DEFAULT_SITE_SETTINGS:
+        if k in data: c.execute('INSERT OR REPLACE INTO site_settings(key,value) VALUES(?,?)',(k,str(data[k] or '')))
+    conn.commit(); conn.close(); return get_site_settings()
+
+init_site_settings()

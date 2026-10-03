@@ -163,6 +163,7 @@ async def process_activation(request_id, uid, username, user_id):
 from fastapi.responses import HTMLResponse
 from typing import Optional
 import secrets
+import hashlib
 
 class PackagePayload(BaseModel):
     id: Optional[int] = None
@@ -183,12 +184,29 @@ class OrderPayload(BaseModel):
 class StatusPayload(BaseModel):
     status: str
 
+class SiteSettingsPayload(BaseModel):
+    site_name: str = ''
+    tagline: str = ''
+    hero_title: str = ''
+    hero_subtitle: str = ''
+    bank_name: str = ''
+    bank_account: str = ''
+    bank_owner: str = ''
+    support_url: str = ''
+    support_text: str = ''
+
 def _admin_ok(request: Request):
-    expected=os.environ.get('ADMIN_WEB_PASSWORD','admin123')
-    return secrets.compare_digest(request.headers.get('x-admin-password',''), expected)
+    # Store only a one-way hash in source; ADMIN_PASSWORD_HASH can override it on Vercel.
+    expected_hash = os.environ.get('ADMIN_PASSWORD_HASH', '30bd56b912a900c43a87fece9debedee2aa0013b0bfe759c7b09810564fce796')
+    supplied = request.headers.get('x-admin-password','')
+    supplied_hash = hashlib.sha256(supplied.encode('utf-8')).hexdigest()
+    return secrets.compare_digest(supplied_hash, expected_hash)
 
 @app.get('/api/packages')
 async def packages_public(): return {'success':True,'packages':db.get_packages(False)}
+
+@app.get('/api/site-config')
+async def site_config_public(): return {'success':True,'config':db.get_site_settings()}
 
 @app.post('/api/orders')
 async def order_create(req: OrderPayload):
@@ -224,3 +242,13 @@ async def admin_orders(request: Request):
 async def admin_order_status(oid:int, req:StatusPayload, request:Request):
     if not _admin_ok(request): raise HTTPException(401,'Unauthorized')
     return {'success':db.update_order_status(oid,req.status)}
+
+@app.get('/api/admin/site-config')
+async def admin_site_config(request: Request):
+    if not _admin_ok(request): raise HTTPException(401,'Unauthorized')
+    return {'config':db.get_site_settings()}
+
+@app.post('/api/admin/site-config')
+async def admin_site_config_save(req: SiteSettingsPayload, request: Request):
+    if not _admin_ok(request): raise HTTPException(401,'Unauthorized')
+    return {'success':True,'config':db.save_site_settings(req.model_dump())}
